@@ -11,11 +11,12 @@ Guidance for AI assistants working in this repository.
 Two-process app:
 
 ```
-client/  Vite + React (port 5173)        server/  Express + Anthropic SDK (port 3000)
+client/  Vite + React (port 5173)        server/  Express + OpenAI SDK → DeepSeek (port 3000)
 ─────────────────────────────────         ──────────────────────────────────────────────
 chat input + sandboxed iframe   ────────► POST /api/chat (SSE)
-└─ postMessage protocol drives             └─ streams Claude reply back
-   a single accumulating iframe               via @anthropic-ai/sdk messages.stream
+└─ postMessage protocol drives             └─ streams DeepSeek reply back
+   a single accumulating iframe               via the OpenAI SDK
+                                              (baseURL: api.deepseek.com)
 ```
 
 The iframe has `sandbox="allow-scripts"` (no `allow-same-origin`) and is bootstrapped once from `client/src/iframe-shell.ts`. Every assistant turn is appended into the same iframe's `<div id="feed">`. The parent never reloads the iframe — it just sends `postMessage` events.
@@ -34,7 +35,7 @@ Iframe → parent: `{type: "ready"}` once on load.
 ### Streaming end-to-end
 
 1. Client `App.tsx` POSTs `{messages}` to `/api/chat` with `fetch` + `ReadableStream` (POST + streaming, unlike EventSource).
-2. Server pipes Anthropic's `messages.stream` text deltas as SSE `data:` lines (`{type: "chunk", text}` or `{type: "done"}` / `{type: "error"}`).
+2. Server pipes the OpenAI SDK's `chat.completions.create({stream: true})` deltas as SSE `data:` lines (`{type: "chunk", text}` or `{type: "done"}` / `{type: "error"}`).
 3. Client decodes SSE and forwards each chunk's text to the iframe via `postMessage`.
 
 ## Repository layout
@@ -54,8 +55,8 @@ html-only-agent/
 │   ├── package.json
 │   └── src/
 │       ├── index.ts              # POST /api/chat SSE endpoint
-│       └── claude.ts             # SDK wrapper, system prompt, streaming
-├── .env.example                  # ANTHROPIC_API_KEY=, PORT=3000
+│       └── llm.ts                # OpenAI SDK wrapper, system prompt, streaming
+├── .env.example                  # DEEPSEEK_API_KEY=, PORT=3000
 ├── .gitignore
 ├── README.md
 └── CLAUDE.md
@@ -63,7 +64,7 @@ html-only-agent/
 
 ## Core product contract
 
-Model output is **HTML, not Markdown**. The system prompt in `server/src/claude.ts` enforces:
+Model output is **HTML, not Markdown**. The system prompt in `server/src/llm.ts` enforces:
 
 - Reply with valid HTML only; wrap the entire response in a single root element (`<div>...</div>`).
 - No `<html>`, `<head>`, or `<body>` tags.
@@ -72,25 +73,25 @@ Model output is **HTML, not Markdown**. The system prompt in `server/src/claude.
 - For visualizations: inline `<svg>`, `<canvas>` + `<script>`, or HTML primitives.
 - Plain-text replies still get a `<div>` wrapper with sensible Tailwind typography.
 
-If the model breaks these rules, fix the system prompt in `claude.ts` rather than working around it in the renderer.
+If the model breaks these rules, fix the system prompt in `llm.ts` rather than working around it in the renderer.
 
 ## Security model
 
 - Outer iframe: `sandbox="allow-scripts"` only. No `allow-same-origin` — the iframe runs in a unique origin and cannot read parent cookies, `localStorage`, or navigate the parent.
-- API key (`ANTHROPIC_API_KEY`) lives on the server. The frontend never sees it. `cors` is permissive (`origin: true`) for local dev — tighten before deploying.
+- API key (`DEEPSEEK_API_KEY`) lives on the server. The frontend never sees it. `cors` is permissive (`origin: true`) for local dev — tighten before deploying.
 - Tailwind CDN is fetched from the iframe over HTTPS. Sandboxed iframes can still make outbound network requests; if you want to lock that down, add a `<meta http-equiv="Content-Security-Policy">` to each turn or to the shell.
 
 ## Streaming caveats
 
 - During streaming, assistant HTML is rendered with `innerHTML = buffer` for live preview. **`<script>` tags inserted via `innerHTML` do not execute** — visualizations only animate after `turn-end`, when the buffer is reparsed and scripts are cloned/re-appended.
 - Tailwind's Play CDN has a `MutationObserver` that picks up new utility classes on each chunk — no extra plumbing needed for live class generation.
-- The Anthropic SDK's system prompt is wrapped with `cache_control: {type: "ephemeral"}` so repeat turns hit the prompt cache. Don't add timestamps or per-request IDs to the system prompt — that would silently invalidate the cache. See `shared/prompt-caching.md` for the full audit checklist.
+- DeepSeek does context caching server-side automatically (no `cache_control` markers needed); identical prefixes are cached on hit. Don't interpolate timestamps or per-request IDs into the system prompt — that would silently invalidate the cache.
 
 ## Running locally
 
 ```bash
 # 1. Set up env
-cp .env.example .env  # then fill in ANTHROPIC_API_KEY
+cp .env.example .env  # then fill in DEEPSEEK_API_KEY (https://platform.deepseek.com)
 
 # 2. Install + run server (terminal 1)
 cd server
@@ -118,9 +119,11 @@ There is no test suite yet.
 
 ## Model + SDK conventions
 
-- Model: `claude-sonnet-4-6` (set in `server/src/claude.ts` as `MODEL`).
-- SDK: `@anthropic-ai/sdk` ≥ 0.95 — uses the stable `messages.stream` API with `cache_control` on system blocks.
-- When changing the model: update `MODEL` in `claude.ts`. If you move to Opus 4.7, drop sampling params and switch any thinking config to `{type: "adaptive"}` — see `shared/model-migration.md`.
+- Provider: **DeepSeek** via its OpenAI-compatible API (`https://api.deepseek.com`).
+- Model: `deepseek-chat` (DeepSeek-V3) — set in `server/src/llm.ts` as `MODEL`.
+- SDK: `openai` ≥ 4.77 — uses `chat.completions.create({stream: true})` with `baseURL` pointed at DeepSeek.
+- The other DeepSeek model is `deepseek-reasoner` (R1). It returns chain-of-thought in a separate `reasoning_content` field; for HTML output we want the final answer only, so stick with `deepseek-chat` unless you specifically want to render reasoning.
+- To swap providers, replace the `baseURL` and env var in `llm.ts`. Any OpenAI-compatible endpoint should work without other code changes.
 
 ## Repository & workflow
 

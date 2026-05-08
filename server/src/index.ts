@@ -1,7 +1,9 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ path: "../.env" });
+
 import express from "express";
 import cors from "cors";
-import { streamChat, type ChatMessage } from "./claude.js";
+import { streamChat, type ChatMessage } from "./llm.js";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);

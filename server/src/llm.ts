@@ -1,6 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
-export const MODEL = "claude-sonnet-4-6";
+export const MODEL = "deepseek-chat";
 
 export const SYSTEM_PROMPT = `You are an HTML rendering assistant in a chat surface where every reply is rendered as live HTML inside a sandboxed iframe.
 
@@ -27,23 +27,38 @@ export interface StreamHandlers {
   onEnd: () => void;
 }
 
-export function streamChat(messages: ChatMessage[], handlers: StreamHandlers): void {
-  const client = new Anthropic();
+export async function streamChat(
+  messages: ChatMessage[],
+  handlers: StreamHandlers,
+): Promise<void> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    handlers.onError(new Error("DEEPSEEK_API_KEY is not set"));
+    return;
+  }
 
-  const stream = client.messages.stream({
-    model: MODEL,
-    max_tokens: 4096,
-    system: [
-      {
-        type: "text",
-        text: SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+  const client = new OpenAI({
+    apiKey,
+    baseURL: "https://api.deepseek.com",
   });
 
-  stream.on("text", handlers.onText);
-  stream.on("error", handlers.onError);
-  stream.on("end", handlers.onEnd);
+  try {
+    const stream = await client.chat.completions.create({
+      model: MODEL,
+      stream: true,
+      max_tokens: 4096,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages.map((m) => ({ role: m.role, content: m.content })),
+      ],
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content;
+      if (text) handlers.onText(text);
+    }
+    handlers.onEnd();
+  } catch (err) {
+    handlers.onError(err instanceof Error ? err : new Error(String(err)));
+  }
 }
