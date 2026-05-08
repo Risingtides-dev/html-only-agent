@@ -1,0 +1,114 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.app header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.app header h1 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.app header span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.app main {
+  position: relative;
+  overflow: hidden;
+}
+
+.app iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #f8fafc;
+}
+
+.app form {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.app form input {
+  flex: 1;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.6);
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.app form input:focus {
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.app form button {
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.6rem;
+  border: 0;
+  background: #6366f1;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app .error {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.6rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+  font-size: 0.85rem;
+}
