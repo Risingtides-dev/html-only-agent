@@ -27,6 +27,14 @@ export default function App() {
     iframeRef.current?.contentWindow?.postMessage(msg, "*");
   }
 
+  function resetChat() {
+    if (streaming) return;
+    setMessages([]);
+    setInput("");
+    setError(null);
+    post({ type: "reset" });
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const userText = input.trim();
@@ -74,6 +82,17 @@ export default function App() {
           if (payload.type === "chunk") {
             assembled += payload.text;
             post({ type: "chunk", id: assistantId, text: payload.text });
+          } else if (payload.type === "thinking") {
+            post({ type: "thinking", id: assistantId, text: payload.text });
+          } else if (payload.type === "tool") {
+            post({
+              type: "tool",
+              id: assistantId,
+              name: payload.name,
+              args: payload.args,
+              status: payload.status,
+              error: payload.error,
+            });
           } else if (payload.type === "error") {
             throw new Error(payload.message);
           }
@@ -95,7 +114,18 @@ export default function App() {
     <div className="app">
       <header>
         <h1>html-only-agent</h1>
-        <span>{iframeReady ? "ready" : "loading…"}</span>
+        <div className="header-right">
+          <button
+            type="button"
+            onClick={resetChat}
+            disabled={streaming || messages.length === 0}
+          >
+            New chat
+          </button>
+          <span className={`status ${iframeReady ? "ready" : "loading"}`}>
+            {iframeReady ? "ready" : "loading"}
+          </span>
+        </div>
       </header>
       <main>
         <iframe
