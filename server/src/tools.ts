@@ -1,3 +1,5 @@
+import { getFile, listFiles, READ_TEXT_CAP } from "./sessions.js";
+
 export interface ToolDef {
   type: "function";
   function: {
@@ -138,9 +140,40 @@ export const TOOLS: ToolDef[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "list_files",
+      description:
+        "List files the user uploaded for this conversation. Returns name, mime type, and size. Call this whenever uploaded context might be relevant.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_file",
+      description:
+        "Read an uploaded file's text contents. Use the exact filename from list_files. Output is UTF-8, capped at 100 KB per call.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Exact filename from list_files." },
+        },
+        required: ["name"],
+      },
+    },
+  },
 ];
 
-export type ToolHandler = (args: Record<string, unknown>) => Promise<string>;
+export interface ToolContext {
+  sessionId?: string;
+}
+
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+) => Promise<string>;
 
 function arg(args: Record<string, unknown>, ...keys: string[]): unknown {
   for (const k of keys) {
@@ -314,5 +347,26 @@ export const HANDLERS: Record<string, ToolHandler> = {
     const body = await res.text();
     if (!res.ok) return `Error: Massive ${res.status}: ${body.slice(0, 200)}`;
     return body.slice(0, MAX_BODY);
+  },
+
+  list_files: async (_args, ctx) => {
+    if (!ctx.sessionId) return JSON.stringify([]);
+    const files = listFiles(ctx.sessionId);
+    return JSON.stringify(files);
+  },
+
+  read_file: async (args, ctx) => {
+    if (!ctx.sessionId) return "Error: no session";
+    const name = String(arg(args, "name", "filename", "file") ?? "");
+    if (!name) return "Error: missing 'name' argument";
+    const file = getFile(ctx.sessionId, name);
+    if (!file) {
+      const available = listFiles(ctx.sessionId)
+        .map((f) => f.name)
+        .join(", ");
+      return `Error: file not found: ${name}. Available: ${available || "(none)"}`;
+    }
+    if (file.text.length <= READ_TEXT_CAP) return file.text;
+    return file.text.slice(0, READ_TEXT_CAP) + `\n\n[truncated — file is ${file.size} bytes; first ${READ_TEXT_CAP} chars shown]`;
   },
 };

@@ -330,3 +330,146 @@ body {
   border-radius: var(--r-xs);
   backdrop-filter: blur(8px);
 }
+
+/* — drop overlay — */
+.app main {
+  position: relative;
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: var(--s-3);
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-input-focus);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+  backdrop-filter: blur(2px);
+}
+
+.drop-overlay-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.drop-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+
+.drop-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+
+/* — file pills row — */
+.app .files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 3px 4px 3px 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  border-radius: var(--r-xs);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  transition: border-color var(--t-quick), background var(--t-quick);
+}
+
+.file-pill:hover {
+  border-color: var(--border-strong);
+}
+
+.file-pill .file-name {
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-pill .file-size {
+  color: var(--fg-dim);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.file-pill button {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-xs);
+  transition: color var(--t-quick), background var(--t-quick);
+}
+
+.file-pill button:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-input-focus);
+}
+
+.file-pill button:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+/* — attach button (form) — */
+.app form button.attach {
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--t-quick), border-color var(--t-quick), background var(--t-quick);
+}
+
+.app form button.attach:hover:not(:disabled) {
+  color: var(--fg);
+  border-color: var(--border-strong);
+  background: var(--bg-input);
+}
+
+.app form button.attach:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
