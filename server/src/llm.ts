@@ -1,34 +1,65 @@
-import OpenAI from "openai";
+import { TOOLS, HANDLERS } from "./tools.js";
 
-export const MODEL = "deepseek-chat";
+export const MODEL = "deepseek-v4-flash";
+const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 
-export const SYSTEM_PROMPT = `You are an HTML rendering assistant in a chat surface where every reply is rendered as live HTML inside a sandboxed iframe.
+function nowEastern(): string {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZoneName: "short",
+  });
+  return fmt.format(new Date());
+}
 
-Output rules:
-- Reply with valid HTML only. Do not use Markdown. Do not write any commentary outside the HTML.
-- Wrap your entire response in a single root element (e.g. <div>...</div>). Do NOT include <html>, <head>, or <body> tags.
-- Tailwind CSS is preloaded in the iframe. Style with Tailwind utility classes (e.g. class="rounded-xl bg-slate-100 p-6 shadow"). Avoid inline style="..." and avoid <style> blocks unless you genuinely need custom CSS.
-- For visualizations, use inline <svg>, <canvas> + <script>, or HTML primitives. All scripts must be self-contained.
-- Do NOT load external resources. No <link rel="stylesheet">, no <img src="https://...">, no remote <script src>. Inline all data and assets (data: URLs are fine).
-- For text-only replies, still wrap in a <div> with sensible Tailwind typography (e.g. class="prose prose-slate max-w-none space-y-3").
-- Aim for clean, modern visual design: generous spacing, rounded corners, subtle shadows, restrained color palette.
-- Keep responses self-contained and reasonably sized. The full HTML of every prior reply may be sent back to you on the next turn, so do not generate gigantic embedded payloads when a smaller representation works.
+export const SYSTEM_PROMPT = `You render replies as live HTML inside a sandboxed iframe with Tailwind (+ typography plugin) preloaded.
 
-Begin every reply directly with the opening tag of your root element.`;
+You have tools to fetch live data: web search, web fetch, weather, news, places (Google), street view, market quotes, and price aggregates. Use them whenever the user's question requires current/real-world information instead of guessing.
+
+Format: a short plaintext intro is welcome — speak like a designer handing over a draft — then one HTML block wrapped in a single root <div>...</div>. No <html>, <head>, or <body> tags. No Markdown syntax.
+
+Aesthetic — editorial with punch. Think New York Magazine spreads, Bloomberg Terminal, Wired features, FT Weekend. Strong typographic hierarchy: oversized hero numbers and display headlines (text-5xl / text-6xl with bold weights), tight all-caps mono kickers above sections, generous pull-quote treatments. Sharp corners (avoid rounded-*), hairline borders (border-slate-200/300), confident whitespace. Muted base (slate / stone / zinc) PLUS one saturated accent per render — emerald for up/positive, rose for down/negative, amber for caution, indigo for emphasis — used to draw the eye, not paint walls. Tabular numerals (font-mono, tabular-nums) for any data, sized large. Use rules (border-t / border-b) and grids to compose, not boxes-on-boxes. No emojis, no gradients, no bouncy shadows. Make it feel designed, not minimal.
+
+Style with Tailwind utility classes. For visualizations, inline <svg>, <canvas> + <script>, or HTML primitives — fully self-contained.
+
+For places, prefer the Places UI Kit web components when get_places returns IDs: <gmp-place-details><gmp-place-details-place-request place="PLACE_ID"></gmp-place-details-place-request><gmp-place-content-config></gmp-place-content-config></gmp-place-details>. The iframe loads Maps JS so these render natively.
+
+External assets are fine; sandbox allows outbound. Don't invent specific photo URLs — prefer stable patterns: picsum.photos/{w}/{h}, placehold.co/{w}x{h}, cdn.simpleicons.org/{slug} (brand logos), flagcdn.com/w320/{cc}.png (flags), youtube.com/embed/{id} (video), upload.wikimedia.org/... (public domain).
+
+Units: American/imperial throughout — °F for temperature, mph for wind, miles, feet, oz, lb, USD. Convert from API responses if they come back metric.
+
+Prior assistant HTML may be sent back. Keep replies self-contained and reasonably sized so context doesn't bloat.`;
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
+export interface ToolEvent {
+  name: string;
+  args: Record<string, unknown>;
+  status: "start" | "end";
+  result?: string;
+  error?: string;
+}
+
 export interface StreamHandlers {
   onText: (text: string) => void;
+  onReasoning: (text: string) => void;
+  onTool: (ev: ToolEvent) => void;
   onError: (err: Error) => void;
   onEnd: () => void;
 }
 
 export async function streamChat(
   messages: ChatMessage[],
+  signal: AbortSignal,
   handlers: StreamHandlers,
 ): Promise<void> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -37,27 +68,148 @@ export async function streamChat(
     return;
   }
 
-  const client = new OpenAI({
-    apiKey,
-    baseURL: "https://api.deepseek.com",
-  });
+  const convo: any[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: `Current time: ${nowEastern()}.` },
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  ];
 
   try {
-    const stream = await client.chat.completions.create({
-      model: MODEL,
-      stream: true,
-      max_tokens: 4096,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
-      ],
-    });
+    let round = 0;
+    while (true) {
+      round++;
+      const t0 = Date.now();
+      const reqBody = JSON.stringify({
+        model: MODEL,
+        stream: true,
+        max_tokens: 40000,
+        messages: convo,
+        tools: TOOLS,
+        thinking: { type: "disabled" },
+      });
+      const res = await fetch(DEEPSEEK_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: reqBody,
+        signal,
+      });
+      console.log(`[llm] r${round} HTTP ${res.status} in ${Date.now() - t0}ms`);
 
-    for await (const chunk of stream) {
-      const text = chunk.choices[0]?.delta?.content;
-      if (text) handlers.onText(text);
+      if (!res.ok || !res.body) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`DeepSeek ${res.status}: ${body.slice(0, 300)}`);
+      }
+
+      const assistantMessage: any = { role: "assistant", content: "" };
+      const accToolCalls = new Map<number, any>();
+      let reasoningContent = "";
+
+      const reader = (res.body as any).getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let firstChunkLogged = false;
+      let done = false;
+
+      streamLoop: while (!done) {
+        const r = await reader.read();
+        done = r.done;
+        if (r.value) buf += decoder.decode(r.value, { stream: !done });
+
+        const events = buf.split("\n\n");
+        buf = events.pop() ?? "";
+        for (const ev of events) {
+          const line = ev.split("\n").find((l) => l.startsWith("data: "));
+          if (!line) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]") {
+            done = true;
+            break streamLoop;
+          }
+          let chunk: any;
+          try {
+            chunk = JSON.parse(payload);
+          } catch {
+            continue;
+          }
+          if (!firstChunkLogged) {
+            firstChunkLogged = true;
+            console.log(`[llm] r${round} first chunk after ${Date.now() - t0}ms`);
+          }
+          const delta = chunk.choices?.[0]?.delta;
+          if (!delta) continue;
+
+          const reasoningDelta = delta.reasoning_content;
+          if (reasoningDelta) {
+            reasoningContent += reasoningDelta;
+            handlers.onReasoning(reasoningDelta);
+          }
+          if (delta.content) {
+            assistantMessage.content += delta.content;
+            handlers.onText(delta.content);
+          }
+          if (delta.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index ?? 0;
+              let entry = accToolCalls.get(idx);
+              if (!entry) {
+                entry = { id: tc.id ?? "", type: "function", function: { name: "", arguments: "" } };
+                accToolCalls.set(idx, entry);
+              }
+              if (tc.id) entry.id = tc.id;
+              if (tc.function?.name) entry.function.name += tc.function.name;
+              if (tc.function?.arguments) entry.function.arguments += tc.function.arguments;
+            }
+          }
+        }
+      }
+
+      const toolCalls = [...accToolCalls.values()];
+
+      if (toolCalls.length === 0) {
+        handlers.onEnd();
+        return;
+      }
+
+      assistantMessage.tool_calls = toolCalls;
+      if (reasoningContent) assistantMessage.reasoning_content = reasoningContent;
+      convo.push(assistantMessage);
+
+      const results = await Promise.all(
+        toolCalls.map(async (tc) => {
+          let parsed: Record<string, unknown> = {};
+          try {
+            parsed = JSON.parse(tc.function.arguments || "{}");
+          } catch {
+            parsed = { raw: tc.function.arguments };
+          }
+          handlers.onTool({ name: tc.function.name, args: parsed, status: "start" });
+          const handler = HANDLERS[tc.function.name];
+          let result: string;
+          let error: string | undefined;
+          try {
+            result = handler ? await handler(parsed) : `Error: unknown tool ${tc.function.name}`;
+            if (result.startsWith("Error:")) error = result;
+          } catch (err) {
+            result = `Error: ${err instanceof Error ? err.message : String(err)}`;
+            error = result;
+          }
+          handlers.onTool({ name: tc.function.name, args: parsed, status: "end", result, error });
+          return { tc, result };
+        }),
+      );
+
+      for (const r of results) {
+        convo.push({
+          role: "tool",
+          tool_call_id: r.tc.id,
+          content: r.result,
+        });
+      }
     }
-    handlers.onEnd();
   } catch (err) {
     handlers.onError(err instanceof Error ? err : new Error(String(err)));
   }

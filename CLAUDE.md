@@ -69,7 +69,7 @@ Model output is **HTML, not Markdown**. The system prompt in `server/src/llm.ts`
 - Reply with valid HTML only; wrap the entire response in a single root element (`<div>...</div>`).
 - No `<html>`, `<head>`, or `<body>` tags.
 - **Tailwind CSS is preloaded in the iframe** via Play CDN (`https://cdn.tailwindcss.com?plugins=typography`). Style with utility classes — avoid inline `style="..."` and `<style>` blocks unless genuinely needed.
-- Inline all assets. No external `<link>`, remote `<img>`, or remote `<script src>` (data: URLs are fine).
+- External assets (images, video embeds, icons, fonts) are allowed — the sandbox permits outbound network. The system prompt steers the model toward stable URL sources (picsum.photos, placehold.co, cdn.simpleicons.org, flagcdn.com, youtube.com/embed, upload.wikimedia.org) rather than inventing specific photo URLs. Inline `data:` URLs and inline SVG still work for charts and small graphics.
 - For visualizations: inline `<svg>`, `<canvas>` + `<script>`, or HTML primitives.
 - Plain-text replies still get a `<div>` wrapper with sensible Tailwind typography.
 
@@ -120,9 +120,9 @@ There is no test suite yet.
 ## Model + SDK conventions
 
 - Provider: **DeepSeek** via its OpenAI-compatible API (`https://api.deepseek.com`).
-- Model: `deepseek-chat` (DeepSeek-V3) — set in `server/src/llm.ts` as `MODEL`.
+- Model: `deepseek-v4-flash` — set in `server/src/llm.ts` as `MODEL`. `deepseek-v4-pro` is the heavier option for complex visualizations; swap the constant to use it.
 - SDK: `openai` ≥ 4.77 — uses `chat.completions.create({stream: true})` with `baseURL` pointed at DeepSeek.
-- The other DeepSeek model is `deepseek-reasoner` (R1). It returns chain-of-thought in a separate `reasoning_content` field; for HTML output we want the final answer only, so stick with `deepseek-chat` unless you specifically want to render reasoning.
+- v4 replaced V3; the legacy `deepseek-chat` alias may still resolve but is no longer the recommended path. The reasoning model is `deepseek-reasoner` (R1) — it returns chain-of-thought in a separate `reasoning_content` field. For HTML output we want the final answer only, so stick with `deepseek-v4-flash` unless you specifically want to render reasoning.
 - To swap providers, replace the `baseURL` and env var in `llm.ts`. Any OpenAI-compatible endpoint should work without other code changes.
 
 ## Repository & workflow

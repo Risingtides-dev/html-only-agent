@@ -1,24 +1,65 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
   color-scheme: dark;
+
+  /* — color tokens — */
+  --bg: #0a0a0b;
+  --bg-elevated: #131316;
+  --bg-input: rgba(255, 255, 255, 0.04);
+  --bg-input-focus: rgba(255, 255, 255, 0.07);
+  --bg-iframe: #f8fafc;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --fg: #e7e7ea;
+  --fg-muted: #8b8b93;
+  --fg-dim: #5b5b62;
+
+  --accent-bg: #e7e7ea;
+  --accent-fg: #0a0a0b;
+
+  --error-fg: #fca5a5;
+  --error-bg: rgba(248, 113, 113, 0.08);
+  --error-border: rgba(248, 113, 113, 0.22);
+
+  --ok: #84cc16;
+
+  /* — typography — */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* — spacing (4px scale) — */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+
+  /* — radius (sharp by default) — */
+  --r-xs: 2px;
+  --r-sm: 4px;
+
+  /* — motion — */
+  --t-quick: 120ms ease-out;
+  --t-base: 200ms ease-out;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-html,
-body,
-#root {
+html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
 }
 
 body {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11", "tnum";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .app {
@@ -27,30 +68,110 @@ body {
   height: 100%;
   max-width: 1280px;
   margin: 0 auto;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }
 
+/* — header — */
 .app header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .app header h1 {
-  font-size: 0.95rem;
-  font-weight: 600;
   margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg);
 }
 
-.app header span {
-  font-size: 0.75rem;
-  color: #94a3b8;
+.app header h1::after {
+  content: " · v1";
+  color: var(--fg-dim);
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
+.app header .header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.app header .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.app header .status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--fg-dim);
+  display: inline-block;
+}
+
+.app header .status.ready {
+  color: var(--fg-muted);
+}
+
+.app header .status.ready::before {
+  background: var(--ok);
+}
+
+.app header .status.loading::before {
+  background: #facc15;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* — header button (ghost) — */
+.app header button {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: color var(--t-quick), border-color var(--t-quick), background var(--t-quick);
+}
+
+.app header button:hover:not(:disabled) {
+  color: var(--fg);
+  border-color: var(--border-strong);
+  background: var(--bg-input);
+}
+
+.app header button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* — main / iframe — */
 .app main {
   position: relative;
   overflow: hidden;
+  background: var(--bg-iframe);
 }
 
 .app iframe {
@@ -58,57 +179,77 @@ body {
   width: 100%;
   height: 100%;
   border: 0;
-  background: #f8fafc;
+  background: var(--bg-iframe);
 }
 
+/* — form / footer — */
 .app form {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.15);
-  background: rgba(15, 23, 42, 0.8);
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .app form input {
   flex: 1;
-  padding: 0.6rem 0.9rem;
-  border-radius: 0.6rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(30, 41, 59, 0.6);
-  color: inherit;
-  font: inherit;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
   outline: none;
+  transition: border-color var(--t-quick), background var(--t-quick);
+}
+
+.app form input::placeholder {
+  color: var(--fg-dim);
 }
 
 .app form input:focus {
-  border-color: rgba(99, 102, 241, 0.6);
+  border-color: var(--border-strong);
+  background: var(--bg-input-focus);
 }
 
 .app form button {
-  padding: 0.6rem 1.1rem;
-  border-radius: 0.6rem;
-  border: 0;
-  background: #6366f1;
-  color: white;
-  font: inherit;
+  padding: 10px 18px;
+  background: var(--accent-bg);
+  color: var(--accent-fg);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
   font-weight: 600;
+  letter-spacing: 0.005em;
+  border: 0;
+  border-radius: var(--r-xs);
   cursor: pointer;
+  transition: opacity var(--t-quick), background var(--t-quick);
+  min-width: 92px;
+}
+
+.app form button:hover:not(:disabled) {
+  opacity: 0.88;
 }
 
 .app form button:disabled {
-  opacity: 0.5;
+  opacity: 0.32;
   cursor: not-allowed;
 }
 
+/* — error — */
 .app .error {
   position: absolute;
-  bottom: 1rem;
-  left: 1rem;
-  right: 1rem;
-  padding: 0.6rem 0.9rem;
-  border-radius: 0.6rem;
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #fecaca;
-  font-size: 0.85rem;
+  bottom: var(--s-4);
+  left: var(--s-4);
+  right: var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-fg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: -0.005em;
+  border-radius: var(--r-xs);
+  backdrop-filter: blur(8px);
 }
