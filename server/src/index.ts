@@ -29,24 +29,50 @@ app.post("/api/chat", (req, res) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
+  const controller = new AbortController();
+  let closed = false;
+
   const send = (data: unknown) => {
+    if (closed) return;
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  const ping = setInterval(() => res.write(": ping\n\n"), 15000);
+  const ping = setInterval(() => {
+    if (!closed) res.write(": ping\n\n");
+  }, 15000);
 
-  req.on("close", () => clearInterval(ping));
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(ping);
+    controller.abort();
+  };
 
-  streamChat(messages, {
+  res.on("close", cleanup);
+
+  streamChat(messages, controller.signal, {
     onText: (text) => send({ type: "chunk", text }),
+    onReasoning: (text) => send({ type: "thinking", text }),
+    onTool: (ev) =>
+      send({
+        type: "tool",
+        name: ev.name,
+        args: ev.args,
+        status: ev.status,
+        ...(ev.error ? { error: ev.error } : {}),
+      }),
     onError: (err) => {
+      if (controller.signal.aborted) {
+        cleanup();
+        return;
+      }
       send({ type: "error", message: err.message });
-      clearInterval(ping);
+      cleanup();
       res.end();
     },
     onEnd: () => {
       send({ type: "done" });
-      clearInterval(ping);
+      cleanup();
       res.end();
     },
   });
