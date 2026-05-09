@@ -1,4 +1,5 @@
 import { TOOLS, HANDLERS } from "./tools.js";
+import { manifestLine } from "./sessions.js";
 
 export const MODEL = "deepseek-v4-flash";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
@@ -88,6 +89,7 @@ export interface StreamHandlers {
 export async function streamChat(
   messages: ChatMessage[],
   theme: string | undefined,
+  sessionId: string | undefined,
   signal: AbortSignal,
   handlers: StreamHandlers,
 ): Promise<void> {
@@ -99,10 +101,13 @@ export async function streamChat(
 
   const priorMessages = messages.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
   const latest = messages[messages.length - 1];
+  const manifest = sessionId ? manifestLine(sessionId) : null;
+  const perTurn = [themeBrief(theme), `Current time: ${nowEastern()}.`];
+  if (manifest) perTurn.push(manifest);
   const convo: any[] = [
     { role: "system", content: SYSTEM_PROMPT },
     ...priorMessages,
-    { role: "system", content: `${themeBrief(theme)}\n\nCurrent time: ${nowEastern()}.` },
+    { role: "system", content: perTurn.join("\n\n") },
   ];
   if (latest) convo.push({ role: latest.role, content: latest.content });
 
@@ -223,7 +228,7 @@ export async function streamChat(
           let result: string;
           let error: string | undefined;
           try {
-            result = handler ? await handler(parsed) : `Error: unknown tool ${tc.function.name}`;
+            result = handler ? await handler(parsed, { sessionId }) : `Error: unknown tool ${tc.function.name}`;
             if (result.startsWith("Error:")) error = result;
           } catch (err) {
             result = `Error: ${err instanceof Error ? err.message : String(err)}`;
