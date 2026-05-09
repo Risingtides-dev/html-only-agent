@@ -31,6 +31,98 @@ export const IFRAME_SHELL = `<!doctype html>
     .status-line .sep { color: #cbd5e1; margin: 0 0.4em; }
     .status-line .detail { color: #94a3b8; }
     .status-line.fading { opacity: 0; transform: translateY(-2px); }
+    .turn-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(148, 163, 184, 0.18);
+      opacity: 0;
+      animation: actionFade 250ms ease-out 80ms forwards;
+    }
+    @keyframes actionFade {
+      to { opacity: 1; }
+    }
+    .turn-actions button {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: color 120ms ease-out, border-color 120ms ease-out, background 120ms ease-out;
+    }
+    .turn-actions button:hover {
+      color: #0f172a;
+      border-color: rgba(148, 163, 184, 0.55);
+      background: rgba(148, 163, 184, 0.06);
+    }
+    .refine-input {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(148, 163, 184, 0.18);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      animation: actionFade 220ms ease-out forwards;
+    }
+    .refine-input textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.04);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 2px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      color: #0f172a;
+      resize: none;
+      outline: none;
+      transition: border-color 120ms ease-out, background 120ms ease-out;
+      box-sizing: border-box;
+    }
+    .refine-input textarea:focus {
+      border-color: rgba(148, 163, 184, 0.55);
+      background: rgba(15, 23, 42, 0.06);
+    }
+    .refine-input textarea::placeholder { color: #94a3b8; }
+    .refine-input .refine-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .refine-input .refine-buttons button {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 2px;
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+      transition: color 120ms ease-out, border-color 120ms ease-out, background 120ms ease-out;
+    }
+    .refine-input .refine-buttons button:disabled { opacity: 0.35; cursor: not-allowed; }
+    .refine-input .refine-buttons button:hover:not(:disabled) {
+      color: #0f172a;
+      border-color: rgba(148, 163, 184, 0.55);
+      background: rgba(148, 163, 184, 0.06);
+    }
+    .refine-input .refine-buttons button.primary {
+      background: #0f172a;
+      color: #e7e7ea;
+      border-color: #0f172a;
+    }
+    .refine-input .refine-buttons button.primary:hover:not(:disabled) {
+      background: #1e293b;
+      border-color: #1e293b;
+      color: #fff;
+    }
   </style>
 </head>
 <body class="min-h-screen p-6">
@@ -189,7 +281,86 @@ export const IFRAME_SHELL = `<!doctype html>
           newScript.textContent = oldScript.textContent;
           oldScript.replaceWith(newScript);
         });
+        addTurnActions(t, id);
         scrollToBottom();
+      }
+
+      function addTurnActions(t, id) {
+        if (t.el.querySelector('.turn-actions')) return;
+        const actions = buildActions(t, id);
+        t.el.appendChild(actions);
+      }
+
+      function buildActions(t, id) {
+        const actions = document.createElement('div');
+        actions.className = 'turn-actions';
+        const refine = document.createElement('button');
+        refine.type = 'button';
+        refine.textContent = 'Refine';
+        refine.addEventListener('click', () => openRefine(t, id, actions));
+        const html = document.createElement('button');
+        html.type = 'button';
+        html.textContent = 'Save HTML';
+        html.addEventListener('click', () => exportTurn(id, 'html'));
+        const pdf = document.createElement('button');
+        pdf.type = 'button';
+        pdf.textContent = 'Save PDF';
+        pdf.addEventListener('click', () => exportTurn(id, 'pdf'));
+        actions.append(refine, html, pdf);
+        return actions;
+      }
+
+      function openRefine(t, id, actions) {
+        const wrap = document.createElement('div');
+        wrap.className = 'refine-input';
+        const ta = document.createElement('textarea');
+        ta.placeholder = 'How should I refine this? (⌘/Ctrl+Enter to send, Esc to cancel)';
+        ta.rows = 2;
+        const buttons = document.createElement('div');
+        buttons.className = 'refine-buttons';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.textContent = 'Cancel';
+        const submit = document.createElement('button');
+        submit.type = 'button';
+        submit.className = 'primary';
+        submit.textContent = 'Send';
+        submit.disabled = true;
+        buttons.append(cancel, submit);
+        wrap.append(ta, buttons);
+        actions.replaceWith(wrap);
+        setTimeout(() => ta.focus(), 0);
+
+        const doCancel = () => {
+          wrap.replaceWith(buildActions(t, id));
+        };
+        const doSubmit = () => {
+          const note = ta.value.trim();
+          if (!note) return;
+          window.parent.postMessage({ type: 'refine', id: id, note: note }, '*');
+          doCancel();
+        };
+        ta.addEventListener('input', () => { submit.disabled = !ta.value.trim(); });
+        ta.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); doSubmit(); }
+          if (e.key === 'Escape') { e.preventDefault(); doCancel(); }
+        });
+        cancel.addEventListener('click', doCancel);
+        submit.addEventListener('click', doSubmit);
+      }
+
+      function exportTurn(id, format) {
+        const t = turns.get(id);
+        if (!t) return;
+        const body = bodyEl(t);
+        const liveHTML = body ? body.innerHTML : t.buffer;
+        window.parent.postMessage({
+          type: 'export',
+          id: id,
+          format: format,
+          html: liveHTML,
+          ts: Date.now(),
+        }, '*');
       }
 
       window.addEventListener('message', (e) => {
