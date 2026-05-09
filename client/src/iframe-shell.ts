@@ -7,14 +7,63 @@ export const IFRAME_SHELL = `<!doctype html>
     html, body { margin: 0; padding: 0; }
     body {
       background: #f8fafc;
+      color: #0f172a;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      transition: background 200ms ease-out, color 200ms ease-out;
     }
-    .turn { animation: fadeIn 220ms ease-out; }
+    body[data-theme="dark"] {
+      background: #0a0a0b;
+      color: #e7e7ea;
+    }
+    body[data-theme="paper"] {
+      background: #f5ecd6;
+      color: #3a2a1c;
+      font-family: "Charter", "Iowan Old Style", "Palatino", Georgia, "Times New Roman", serif;
+    }
+    .turn {
+      animation: fadeIn 220ms ease-out;
+      padding: 18px 22px;
+      border: 1px solid transparent;
+      transition: background 200ms ease-out, color 200ms ease-out, border-color 200ms ease-out;
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: none; }
     }
-    .turn-user { align-self: flex-end; max-width: 80%; }
+
+    /* Default (light) theme */
+    .turn[data-role="user"] {
+      align-self: flex-end;
+      max-width: 80%;
+      padding: 11px 16px;
+      background: #0f172a;
+      color: #fff;
+    }
+    .turn[data-role="assistant"] {
+      background: #ffffff;
+      color: #0f172a;
+      border-color: rgba(15, 23, 42, 0.08);
+    }
+
+    body[data-theme="dark"] .turn[data-role="user"] {
+      background: #e7e7ea;
+      color: #0a0a0b;
+    }
+    body[data-theme="dark"] .turn[data-role="assistant"] {
+      background: #131316;
+      color: #e7e7ea;
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    body[data-theme="paper"] .turn[data-role="user"] {
+      background: #3a2a1c;
+      color: #f5ecd6;
+    }
+    body[data-theme="paper"] .turn[data-role="assistant"] {
+      background: #faf3e3;
+      color: #3a2a1c;
+      border-color: rgba(60, 40, 20, 0.16);
+    }
     .tool-status { margin-bottom: 0.5rem; min-height: 0; }
     .tool-status:empty { display: none; }
     .status-line {
@@ -139,11 +188,10 @@ export const IFRAME_SHELL = `<!doctype html>
       function startTurn(id, role, text) {
         const el = document.createElement('div');
         el.dataset.role = role;
+        el.className = 'turn';
         if (role === 'user') {
-          el.className = 'turn turn-user bg-slate-900 text-white px-4 py-3';
           el.textContent = text || '';
         } else {
-          el.className = 'turn bg-white border border-slate-200 px-5 py-4';
           const status = document.createElement('div');
           status.className = 'tool-status';
           el.appendChild(status);
@@ -371,6 +419,9 @@ export const IFRAME_SHELL = `<!doctype html>
           case 'chunk': return appendChunk(msg.id, msg.text);
           case 'thinking': return appendThinking(msg.id, msg.text);
           case 'tool': return handleTool(msg.id, msg.name, msg.args, msg.status, msg.error);
+          case 'theme':
+            document.body.dataset.theme = msg.mode || 'light';
+            return;
           case 'turn-end': return finalizeTurn(msg.id);
           case 'reset':
             for (const t of turns.values()) {

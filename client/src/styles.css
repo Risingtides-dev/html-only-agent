@@ -1,4 +1,5 @@
-:root {
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
 
   /* — color tokens — */
@@ -6,7 +7,7 @@
   --bg-elevated: #131316;
   --bg-input: rgba(255, 255, 255, 0.04);
   --bg-input-focus: rgba(255, 255, 255, 0.07);
-  --bg-iframe: #f8fafc;
+  --bg-iframe: #0a0a0b;
 
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
@@ -43,6 +44,46 @@
   /* — motion — */
   --t-quick: 120ms ease-out;
   --t-base: 200ms ease-out;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f6f7;
+  --bg-elevated: #ffffff;
+  --bg-input: rgba(0, 0, 0, 0.03);
+  --bg-input-focus: rgba(0, 0, 0, 0.05);
+  --bg-iframe: #ffffff;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.18);
+  --fg: #18181b;
+  --fg-muted: #71717a;
+  --fg-dim: #a1a1aa;
+  --accent-bg: #18181b;
+  --accent-fg: #fafafa;
+  --error-fg: #b91c1c;
+  --error-bg: rgba(220, 38, 38, 0.06);
+  --error-border: rgba(220, 38, 38, 0.22);
+  --ok: #16a34a;
+}
+
+[data-theme="paper"] {
+  color-scheme: light;
+  --bg: #e8dcc4;
+  --bg-elevated: #f0e6cf;
+  --bg-input: rgba(60, 40, 20, 0.05);
+  --bg-input-focus: rgba(60, 40, 20, 0.08);
+  --bg-iframe: #f5ecd6;
+  --border: rgba(60, 40, 20, 0.16);
+  --border-strong: rgba(60, 40, 20, 0.30);
+  --fg: #3a2a1c;
+  --fg-muted: #6b5a47;
+  --fg-dim: #a89a82;
+  --accent-bg: #3a2a1c;
+  --accent-fg: #f5ecd6;
+  --error-fg: #9a1a1a;
+  --error-bg: rgba(154, 26, 26, 0.06);
+  --error-border: rgba(154, 26, 26, 0.22);
+  --ok: #5a7a3a;
 }
 
 * { box-sizing: border-box; }
@@ -102,6 +143,42 @@ body {
   display: flex;
   align-items: center;
   gap: var(--s-3);
+}
+
+.theme-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  overflow: hidden;
+}
+
+.theme-switch button {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: color var(--t-quick), background var(--t-quick);
+  border-radius: 0;
+}
+
+.theme-switch button + button {
+  border-left: 1px solid var(--border);
+}
+
+.theme-switch button:hover {
+  color: var(--fg-muted);
+  background: var(--bg-input);
+}
+
+.theme-switch button[data-active="true"] {
+  background: var(--accent-bg);
+  color: var(--accent-fg);
 }
 
 .app header .status {

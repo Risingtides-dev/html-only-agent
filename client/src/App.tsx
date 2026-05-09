@@ -6,6 +6,17 @@ interface ChatMessage {
   content: string;
 }
 
+type Theme = "light" | "dark" | "paper";
+const THEMES: Theme[] = ["light", "dark", "paper"];
+
+function readSavedTheme(): Theme {
+  try {
+    const saved = localStorage.getItem("html-only-agent-theme");
+    if (saved && (THEMES as string[]).includes(saved)) return saved as Theme;
+  } catch {}
+  return "dark";
+}
+
 let tailwindParentPromise: Promise<void> | null = null;
 function ensureTailwindInParent(): Promise<void> {
   if (tailwindParentPromise) return tailwindParentPromise;
@@ -32,18 +43,38 @@ export default function App() {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [theme, setTheme] = useState<Theme>(readSavedTheme);
+
   const messagesRef = useRef<ChatMessage[]>([]);
   const streamingRef = useRef(false);
   const iframeReadyRef = useRef(false);
+  const themeRef = useRef<Theme>(theme);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { streamingRef.current = streaming; }, [streaming]);
   useEffect(() => { iframeReadyRef.current = iframeReady; }, [iframeReady]);
+  useEffect(() => { themeRef.current = theme; }, [theme]);
+
+  useEffect(() => {
+    document.body.dataset.theme = theme;
+    try { localStorage.setItem("html-only-agent-theme", theme); } catch {}
+  }, [theme]);
+
+  useEffect(() => {
+    if (!iframeReady) return;
+    iframeRef.current?.contentWindow?.postMessage({ type: "theme", mode: theme }, "*");
+  }, [theme, iframeReady]);
 
   useEffect(() => {
     function onMessage(e: MessageEvent) {
       if (e.source !== iframeRef.current?.contentWindow) return;
       const data = e.data;
-      if (data?.type === "ready") setIframeReady(true);
+      if (data?.type === "ready") {
+        setIframeReady(true);
+        e.source?.postMessage(
+          { type: "theme", mode: themeRef.current },
+          { targetOrigin: "*" } as WindowPostMessageOptions,
+        );
+      }
       if (data?.type === "export") handleExport(data);
       if (data?.type === "refine" && typeof data.note === "string") {
         if (streamingRef.current || !iframeReadyRef.current) return;
@@ -186,7 +217,7 @@ export default function App() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages }),
+        body: JSON.stringify({ messages: nextMessages, theme: themeRef.current }),
       });
       if (!res.ok || !res.body) {
         throw new Error(`Server error: ${res.status}`);
@@ -242,6 +273,19 @@ export default function App() {
       <header>
         <h1>html-only-agent</h1>
         <div className="header-right">
+          <div className="theme-switch" role="group" aria-label="Theme">
+            {THEMES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                data-active={theme === t}
+                onClick={() => setTheme(t)}
+                aria-pressed={theme === t}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={resetChat}

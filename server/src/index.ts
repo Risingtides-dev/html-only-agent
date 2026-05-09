@@ -17,6 +17,7 @@ app.get("/api/health", (_req, res) => {
 
 app.post("/api/chat", (req, res) => {
   const messages = req.body?.messages as ChatMessage[] | undefined;
+  const theme = req.body?.theme as string | undefined;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     res.status(400).json({ error: "messages must be a non-empty array" });
@@ -50,7 +51,7 @@ app.post("/api/chat", (req, res) => {
 
   res.on("close", cleanup);
 
-  streamChat(messages, controller.signal, {
+  streamChat(messages, theme, controller.signal, {
     onText: (text) => send({ type: "chunk", text }),
     onReasoning: (text) => send({ type: "thinking", text }),
     onTool: (ev) =>
