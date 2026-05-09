@@ -3,6 +3,34 @@ import { TOOLS, HANDLERS } from "./tools.js";
 export const MODEL = "deepseek-v4-flash";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 
+function themeBrief(theme: string | undefined): string {
+  switch (theme) {
+    case "light":
+      return [
+        "ACTIVE THEME: LIGHT. Override any color choices implied by prior turns.",
+        "MUST USE: light backgrounds only (bg-white, bg-slate-50, bg-zinc-50). Dark body text only (text-slate-900, text-zinc-900).",
+        "MUST NOT USE: bg-slate-900, bg-black, bg-zinc-950, text-white, text-zinc-100 or any dark backgrounds.",
+        "Hairline borders: border-slate-200/300. Accents: emerald-600 / rose-600 / amber-600 / indigo-600.",
+      ].join("\n");
+    case "paper":
+      return [
+        "ACTIVE THEME: PAPER. Override any color choices implied by prior turns.",
+        "MUST USE: warm cream/paper backgrounds only (bg-stone-50, bg-amber-50, or inline style=\"background:#f5ecd6\"). Warm brown body text only (text-stone-700, text-stone-800).",
+        "MUST NOT USE: dark backgrounds, black, slate-900, zinc-950, white text, text-zinc-100, or saturated electric colors.",
+        "Use serif fonts throughout (font-serif). Editorial print aesthetic — FT Weekend, NYT Magazine, printed broadsheet.",
+        "Hairline borders: border-stone-300/400. Accents: muted sepia/burgundy (text-amber-800, text-red-900).",
+      ].join("\n");
+    case "dark":
+    default:
+      return [
+        "ACTIVE THEME: DARK. Override any color choices implied by prior turns.",
+        "MUST USE: near-black backgrounds (bg-slate-950, bg-zinc-950, bg-neutral-900). Light body text (text-slate-100, text-zinc-200).",
+        "MUST NOT USE: bg-white, bg-slate-50, text-slate-900, or any light backgrounds.",
+        "Hairline borders: border-white/10 or border-slate-800. Accents: emerald-400 / rose-400 / amber-400 / indigo-400.",
+      ].join("\n");
+  }
+}
+
 function nowEastern(): string {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
@@ -59,6 +87,7 @@ export interface StreamHandlers {
 
 export async function streamChat(
   messages: ChatMessage[],
+  theme: string | undefined,
   signal: AbortSignal,
   handlers: StreamHandlers,
 ): Promise<void> {
@@ -68,11 +97,14 @@ export async function streamChat(
     return;
   }
 
+  const priorMessages = messages.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
+  const latest = messages[messages.length - 1];
   const convo: any[] = [
     { role: "system", content: SYSTEM_PROMPT },
-    { role: "system", content: `Current time: ${nowEastern()}.` },
-    ...messages.map((m) => ({ role: m.role, content: m.content })),
+    ...priorMessages,
+    { role: "system", content: `${themeBrief(theme)}\n\nCurrent time: ${nowEastern()}.` },
   ];
+  if (latest) convo.push({ role: latest.role, content: latest.content });
 
   try {
     let round = 0;
